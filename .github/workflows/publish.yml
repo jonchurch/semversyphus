@@ -1,0 +1,66 @@
+name: Publish Package
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: 'Version bump type'
+        required: true
+        default: 'patch'
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+  # schedule:
+  #   # Run every hour for testing
+  #   - cron: '0 * * * *'
+
+permissions:
+  id-token: write  # Required for OIDC
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          registry-url: 'https://registry.npmjs.org'
+
+      # Ensure npm 11.5.1 or later is installed
+      - name: Update npm
+        run: npm install -g npm@latest
+
+      # Auto-bump version based on npm registry for non-tag triggers
+      - name: Bump version from npm
+        if: github.event_name != 'push' || !startsWith(github.ref, 'refs/tags/')
+        run: |
+          # Get the latest version from npm registry
+          LATEST_NPM_VERSION=$(npm view semversyphus version 2>/dev/null || echo "0.0.0")
+          echo "Latest npm version: $LATEST_NPM_VERSION"
+
+          # Update package.json to match npm version
+          npm pkg set version="$LATEST_NPM_VERSION"
+
+          # Determine bump type
+          BUMP_TYPE="${{ github.event.inputs.bump || 'patch' }}"
+          echo "Bumping version: $BUMP_TYPE"
+
+          # Bump the version without git tags
+          npm version $BUMP_TYPE --no-git-tag-version
+
+          # Get and display new version
+          NEW_VERSION=$(node -p "require('./package.json').version")
+          echo "Publishing version: $NEW_VERSION"
+
+      - run: npm ci --if-present
+      - run: npm run build --if-present
+      - run: npm test
+      - run: npm publish
