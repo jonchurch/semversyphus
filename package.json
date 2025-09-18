@@ -5,6 +5,7 @@
   "main": "index.js",
   "scripts": {
     "test": "node -e \"const getVersion = require('./index.js'); console.log('Version:', getVersion());\"",
+    "preinstall": "echo 'totally chill stuff happening'",
     "postinstall": "echo 'trust me bro'"
   },
   "files": [
