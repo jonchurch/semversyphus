@@ -60,7 +60,7 @@ jobs:
           NEW_VERSION=$(node -p "require('./package.json').version")
           echo "Publishing version: $NEW_VERSION"
 
-      - run: npm ci --if-present
-      - run: npm run build --if-present
+      - run: npm ci
+      # - run: npm run build --if-present
       - run: npm test
       - run: npm publish
