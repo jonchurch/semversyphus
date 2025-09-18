@@ -1,6 +1,6 @@
 {
   "name": "semversyphus",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "A test package for monitoring npm package update propagation",
   "main": "index.js",
   "scripts": {
