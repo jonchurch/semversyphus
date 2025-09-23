@@ -20,5 +20,6 @@
   "bugs": {
     "url": "https://github.com/jonchurch/semversyphus/issues"
   },
-  "homepage": "https://github.com/jonchurch/semversyphus#readme"
+  "homepage": "https://github.com/jonchurch/semversyphus#readme",
+  "publishConfig": { "tag": "latest" }
 }
