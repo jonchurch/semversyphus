@@ -4,9 +4,7 @@
   "description": "A test package for monitoring npm package update propagation",
   "main": "index.js",
   "scripts": {
-    "test": "node -e \"const getVersion = require('./index.js'); console.log('Version:', getVersion());\"",
-    "preinstall": "echo 'totally chill stuff happening'",
-    "postinstall": "echo 'trust me bro'"
+    "test": "node -e \"const getVersion = require('./index.js'); console.log('Version:', getVersion());\""
   },
   "files": [
     "index.js"
