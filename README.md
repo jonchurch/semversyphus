@@ -34,4 +34,4 @@ Returns the current version string from package.json.
 
 **Returns:** `string` - The current package version (e.g., "1.0.0")
 
-Made w/ a non zero amount of care by @jonchurch
+Made w/ a non zero amount of care by @jonchurch ✨
