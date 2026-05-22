@@ -7,7 +7,8 @@
     "test": "node -e \"const getVersion = require('./index.js'); console.log('Version:', getVersion());\""
   },
   "files": [
-    "index.js"
+    "index.js",
+    "README.md"
   ],
   "author": "",
   "license": "MIT",
