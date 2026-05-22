@@ -1,36 +1,58 @@
-name: Publish Package
+name: release
 
 on:
   push:
-    tags:
-      - 'v*'
-  # schedule:
-  #   # Run every hour for testing
-  #   - cron: '0 * * * *'
+    branches: [main]
+  pull_request:
+    types: [closed]
+    branches: [main]
+  # this is required to trigger releases when the release PR is merged, or to rerun a release if needed
+  workflow_dispatch:
 
-permissions:
-  id-token: write  # Required for OIDC
-  contents: read
+permissions: {}
 
 jobs:
-  publish:
+  # Parse commits since the last tag, push a `release/vX.Y.Z` branch, open
+  # or update a draft release PR, and close any superseded release PRs
+  # (e.g. `release/v1.0.1` when the bump is now `release/v1.1.0`).
+  pr:
+    if: github.event_name == 'push' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
     runs-on: ubuntu-latest
+    permissions:
+      contents: write       # push the `release/vX.Y.Z` branch and delete superseded ones
+      pull-requests: write  # create a release PR, update its body, close superseded PRs
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: danielroe/uppt/pr@02a45b8fc28aebb98abf0612ba44e2a4cbb612fd # v0.3.0
         with:
-          persist-credentials: false
+          token: ${{ secrets.GITHUB_TOKEN }}
 
-      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+  # The release PR was merged: tag the squash commit, cut a GitHub release
+  # from the PR body, and dispatch the publish workflow. The `release/v`
+  # head-ref guard keeps regular feature-PR merges from triggering this.
+  release:
+    if: |
+      github.event_name == 'pull_request'
+      && github.event.pull_request.merged == true
+      && startsWith(github.event.pull_request.head.ref, 'release/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write       # push the `vX.Y.Z` tag and create the GitHub release
+      actions: write        # `gh workflow run publish.yml --ref vX.Y.Z` chained dispatch
+    steps:
+      - uses: danielroe/uppt/release@02a45b8fc28aebb98abf0612ba44e2a4cbb612fd # v0.3.0
         with:
-          node-version: '24'
-          registry-url: 'https://registry.npmjs.org'
-          package-manager-cache: false
+          token: ${{ secrets.GITHUB_TOKEN }}
+          publish-workflow: publish.yml
 
-      # Ensure npm 11.5.1 or later is installed
-      - name: Update npm
-        run: npm install -g npm@latest
-
-      - run: npm ci
-      # - run: npm run build --if-present
-      - run: npm test
-      - run: npm stage publish
+  # The chained dispatch from `release` lands here as a `workflow_dispatch`
+  # event on a `vX.Y.Z` tag ref. Manual recovery uses the same path
+  # (Run workflow -> pick a `v*` tag).
+  publish:
+    if: github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read        # checkout the tag
+      id-token: write       # OIDC claim for npm trusted publisher
+    environment: npm        # must match the trusted-publisher entry on npmjs.com
+    steps:
+      - uses: danielroe/uppt/publish@02a45b8fc28aebb98abf0612ba44e2a4cbb612fd # v0.3.0
