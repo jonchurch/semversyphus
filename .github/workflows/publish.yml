@@ -22,37 +22,60 @@ jobs:
       contents: write       # push the `release/vX.Y.Z` branch and delete superseded ones
       pull-requests: write  # create a release PR, update its body, close superseded PRs
     steps:
-      - uses: danielroe/uppt/pr@8da0597c0c549fdfd95a9868df95feb6d04dab26 # v0.4.0
+      - uses: danielroe/uppt/pr@fc0f1c61b54a79c6a354c8f9dbe821bc10a98893 # v0.5.0
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
 
   # The release PR was merged: tag the squash commit, cut a GitHub release
   # from the PR body, and dispatch the publish workflow. The `release/v`
-  # head-ref guard keeps regular feature-PR merges from triggering this.
+  # head-ref guard keeps regular feature-PR merges from triggering this;
+  # the head-repo guard keeps merged fork PRs from triggering it.
   release:
     if: |
       github.event_name == 'pull_request'
       && github.event.pull_request.merged == true
       && startsWith(github.event.pull_request.head.ref, 'release/v')
+      && github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
+    concurrency:
+      group: release-${{ github.event.pull_request.number }}
+      cancel-in-progress: false
     permissions:
       contents: write       # push the `vX.Y.Z` tag and create the GitHub release
-      actions: write        # `gh workflow run publish.yml --ref vX.Y.Z` chained dispatch
+      actions: write        # `gh workflow run release.yml --ref vX.Y.Z` chained dispatch
     steps:
-      - uses: danielroe/uppt/release@8da0597c0c549fdfd95a9868df95feb6d04dab26 # v0.4.0
+      - uses: danielroe/uppt/release@fc0f1c61b54a79c6a354c8f9dbe821bc10a98893 # v0.5.0
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          publish-workflow: publish.yml
 
   # The chained dispatch from `release` lands here as a `workflow_dispatch`
-  # event on a `vX.Y.Z` tag ref. Manual recovery uses the same path
+  # event on a `vX.Y.Z` tag ref. The `pack` job installs deps, runs
+  # `pnpm pack` (or `npm pack`), and uploads the tarball as a workflow
+  # artifact. Lifecycle scripts (`prepack`, `prepare`, `postpack`) run
+  # here, in a job with `permissions: {}` and no `npm` environment.
+  # Manual recovery uses the same path.
   # (Run workflow -> pick a `v*` tag).
-  publish:
+  pack:
     if: github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
+    concurrency:
+      group: pack-${{ github.ref }}
+      cancel-in-progress: false
+    permissions: {}
+    steps:
+      - uses: danielroe/uppt/pack@fc0f1c61b54a79c6a354c8f9dbe821bc10a98893 # v0.5.0
+
+  # `publish` downloads the prebuilt tarball from the pack job's
+  # artifact and stages it for publish.
+  publish:
+    if: github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/tags/v')
+    needs: pack
+    runs-on: ubuntu-latest
+    concurrency:
+      group: publish-${{ github.ref }}
+      cancel-in-progress: false
     permissions:
-      contents: read        # checkout the tag
       id-token: write       # OIDC claim for npm trusted publisher
     environment: npm        # must match the trusted-publisher entry on npmjs.com
     steps:
-      - uses: danielroe/uppt/publish@8da0597c0c549fdfd95a9868df95feb6d04dab26 # v0.4.0
+      - uses: danielroe/uppt/publish@fc0f1c61b54a79c6a354c8f9dbe821bc10a98893 # v0.5.0
